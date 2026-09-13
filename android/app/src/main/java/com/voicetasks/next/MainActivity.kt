@@ -38,6 +38,10 @@ class MainActivity:Activity(){
         web.webViewClient=WebViewClient()
         web.addJavascriptInterface(AndroidBridge(this),"AndroidBridge")
 
+        if(checkSelfPermission(Manifest.permission.RECORD_AUDIO)!=PackageManager.PERMISSION_GRANTED){
+            requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO),REQ_AUDIO)
+        }
+
         if(Build.VERSION.SDK_INT>=33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS),101)
         }
@@ -58,7 +62,7 @@ class MainActivity:Activity(){
 
     private fun startVoiceRecognitionGranted(language:String){
         if(!SpeechRecognizer.isRecognitionAvailable(this)){
-            sendVoiceError()
+            sendVoiceError(-1)
             return
         }
 
@@ -70,10 +74,10 @@ class MainActivity:Activity(){
                 override fun onRmsChanged(rmsdB:Float){}
                 override fun onBufferReceived(buffer:ByteArray?){}
                 override fun onEndOfSpeech(){}
-                override fun onError(error:Int){ sendVoiceError() }
+                override fun onError(error:Int){ sendVoiceError(error) }
                 override fun onResults(results:Bundle?){
                     val text=results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
-                    if(text.isNullOrBlank()) sendVoiceError() else sendVoiceResult(text)
+                    if(text.isNullOrBlank()) sendVoiceError(0) else sendVoiceResult(text)
                 }
                 override fun onPartialResults(partialResults:Bundle?){}
                 override fun onEvent(eventType:Int,params:Bundle?){}
@@ -91,7 +95,7 @@ class MainActivity:Activity(){
             speechRecognizer?.cancel()
             speechRecognizer?.startListening(intent)
         }catch(_:Exception){
-            sendVoiceError()
+            sendVoiceError(-2)
         }
     }
 
@@ -100,8 +104,8 @@ class MainActivity:Activity(){
         runOnUiThread{ web.evaluateJavascript(js,null) }
     }
 
-    private fun sendVoiceError(){
-        runOnUiThread{ web.evaluateJavascript("window.startVoiceError && window.startVoiceError();",null) }
+    private fun sendVoiceError(code:Int){
+        runOnUiThread{ web.evaluateJavascript("window.startVoiceError && window.startVoiceError("+code+");",null) }
     }
 
     fun exportTasks(json:String,filename:String){
@@ -165,7 +169,7 @@ class MainActivity:Activity(){
                 startVoiceRecognitionGranted(lang)
             }else{
                 pendingVoiceLanguage=null
-                sendVoiceError()
+                sendVoiceError(-3)
             }
         }
     }
