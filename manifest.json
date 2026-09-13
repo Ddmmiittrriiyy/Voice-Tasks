@@ -1,0 +1,19 @@
+{
+  "name": "Голосовые задачи",
+  "short_name": "Задачи",
+  "description": "Голосовой планировщик задач. В Android-версии доступен системный будильник.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F7FA",
+  "theme_color": "#F5F7FA",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon-next.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
