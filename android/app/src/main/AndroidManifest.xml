@@ -1,11 +1,19 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
-    <application android:allowBackup="true" android:theme="@style/Theme.VoiceTasks" android:label="Voice Tasks Next" android:usesCleartextTraffic="false">
+
+    <application
+        android:allowBackup="true"
+        android:theme="@style/Theme.VoiceTasks"
+        android:label="Voice Tasks Next"
+        android:icon="@drawable/ic_voice_tasks"
+        android:roundIcon="@drawable/ic_voice_tasks"
+        android:usesCleartextTraffic="false">
         <activity android:name=".AlarmActivity" android:excludeFromRecents="true" android:showWhenLocked="true" android:turnScreenOn="true"/>
         <activity android:name=".MainActivity" android:exported="true">
             <intent-filter>
