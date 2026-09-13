@@ -386,8 +386,12 @@ tasks.forEach(normalizeTask);
 function taskAlarmTimestamp(t){ if(!t||!t.date||!t.time)return null; const d=new Date(`${t.date}T${t.time}:00`); return Number.isNaN(d.getTime())?null:d.getTime(); }
 function scheduleNativeAlarm(t){ if(!hasNativeAlarm()||!t||!t.alarmEnabled)return false; const ts=taskAlarmTimestamp(t); if(!ts)return false; const b=getAndroidBridge(); try{ if(typeof b.scheduleAlarm==='function'){b.scheduleAlarm(String(t.id),String(t.text||''),Number(ts));return true;} if(typeof b.setAlarm==='function'){b.setAlarm(String(t.id),String(t.text||''),String(t.date),String(t.time));return true;} }catch(e){console.error(e)} return false; }
 function cancelNativeAlarm(x){ if(!hasNativeAlarm())return false; const id=typeof x==='object'?x.id:x,b=getAndroidBridge(); try{ if(typeof b.cancelAlarm==='function'){b.cancelAlarm(String(id));return true;} }catch(e){console.error(e)} return false; }
-function setAlarmEnabled(id,enabled){ const t=tasks.find(x=>x.id===id); if(!t)return false; normalizeTask(t); if(enabled){ if(!t.date||!t.time){showToast('Для будильника укажите дату и время задачи');return false;} t.alarmEnabled=true;t.alarmTriggered=false;saveTasks(tasks);scheduleNativeAlarm(t); }else{ cancelNativeAlarm(t);t.alarmEnabled=false;t.alarmTriggered=false;saveTasks(tasks); } render();return true; }
+function setAlarmEnabled(id,enabled){ const t=tasks.find(x=>x.id===id); if(!t)return false; normalizeTask(t); if(enabled){ if(!t.date||!t.time){showToast('Для будильника укажите дату и время задачи');return false;} const ts=taskAlarmTimestamp(t); if(!ts||ts<=Date.now()){openEdit(t);return false;} t.alarmEnabled=true;t.alarmTriggered=false;saveTasks(tasks);scheduleNativeAlarm(t); }else{ cancelNativeAlarm(t);t.alarmEnabled=false;t.alarmTriggered=false;saveTasks(tasks); } render();return true; }
 window.voiceTasksAlarmTriggered=function(taskId){const t=tasks.find(x=>String(x.id)===String(taskId));if(!t)return;normalizeTask(t);t.alarmTriggered=true;saveTasks(tasks);render();};
+function syncNativeTriggeredAlarms(){ if(!hasNativeAlarm())return; const b=getAndroidBridge(); if(!b||typeof b.getTriggeredAlarmIds!=='function')return; try{ const ids=JSON.parse(String(b.getTriggeredAlarmIds()||'[]')); let changed=false; ids.forEach(id=>{const t=tasks.find(x=>String(x.id)===String(id));if(t){normalizeTask(t);if(!t.alarmTriggered||t.alarmEnabled){t.alarmTriggered=true;t.alarmEnabled=false;changed=true;}}}); if(changed){saveTasks(tasks);render();} }catch(e){console.error(e)} }
+window.addEventListener('focus',()=>setTimeout(syncNativeTriggeredAlarms,100));
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)setTimeout(syncNativeTriggeredAlarms,100);});
+setTimeout(syncNativeTriggeredAlarms,700);
 
 /* ---------- Отрисовка ---------- */
 
@@ -646,10 +650,21 @@ function renderCard(t){
   if(hasNativeAlarm() && !t.done){
     normalizeTask(t);
     const alarmBtn=document.createElement('button');
-    alarmBtn.className='alarmIconBtn'+(t.alarmEnabled?' active':'');
+    const overdue=isOverdue(t);
+    let alarmState='inactive';
+    if(t.alarmTriggered) alarmState='triggered';
+    else if(t.alarmEnabled) alarmState='active';
+    else if(overdue) alarmState='overdueInactive';
+    alarmBtn.className='alarmIconBtn '+alarmState;
     alarmBtn.type='button'; alarmBtn.textContent='⏰';
-    alarmBtn.title=t.alarmEnabled?'Отключить будильник':'Активировать будильник';
-    alarmBtn.onclick=()=>setAlarmEnabled(t.id,!t.alarmEnabled);
+    if(alarmState==='active') alarmBtn.title='Будильник активен — отключить';
+    else if(alarmState==='triggered') alarmBtn.title='Будильник сработал — изменить задачу';
+    else if(alarmState==='overdueInactive') alarmBtn.title='Просрочено — изменить задачу';
+    else alarmBtn.title='Активировать будильник';
+    alarmBtn.onclick=()=>{
+      if(overdue || t.alarmTriggered){ openEdit(t); return; }
+      setAlarmEnabled(t.id,!t.alarmEnabled);
+    };
     card.appendChild(alarmBtn);
   }
   return card;
