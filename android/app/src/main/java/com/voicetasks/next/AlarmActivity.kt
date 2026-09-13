@@ -1,14 +1,24 @@
 package com.voicetasks.next
 
-import android.app.*
-import android.os.*
+import android.app.Activity
+import android.os.Build
+import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.view.Gravity
 import android.widget.*
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class AlarmActivity:Activity(){
-    private var ringtone:android.media.Ringtone?=null
+    private var player:MediaPlayer?=null
+    private var vibrator:Vibrator?=null
 
     override fun onCreate(b:Bundle?){
         super.onCreate(b)
@@ -27,7 +37,7 @@ class AlarmActivity:Activity(){
         }
 
         val time=TextView(this).apply{
-            this.text=java.text.SimpleDateFormat("HH:mm").format(java.util.Date())
+            this.text=SimpleDateFormat("HH:mm",Locale.getDefault()).format(Date())
             textSize=48f
             setTextColor(Color.BLACK)
             gravity=Gravity.CENTER
@@ -51,15 +61,49 @@ class AlarmActivity:Activity(){
         box.addView(stop)
         setContentView(box)
 
-        ringtone=RingtoneManager.getRingtone(
-            this,
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
-        )
-        ringtone?.play()
+        startAlarmSound()
+        startVibration()
+    }
+
+    private fun startAlarmSound(){
+        val uri=RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+            ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        try{
+            player=MediaPlayer().apply{
+                setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                )
+                setDataSource(this@AlarmActivity,uri)
+                isLooping=true
+                prepare()
+                start()
+            }
+        }catch(_:Exception){
+            player?.release()
+            player=null
+        }
+    }
+
+    private fun startVibration(){
+        vibrator=if(Build.VERSION.SDK_INT>=31){
+            getSystemService(VibratorManager::class.java).defaultVibrator
+        }else{
+            @Suppress("DEPRECATION")
+            getSystemService(VIBRATOR_SERVICE) as Vibrator
+        }
+
+        val pattern=longArrayOf(0,700,450,700,450)
+        vibrator?.vibrate(VibrationEffect.createWaveform(pattern,0))
     }
 
     override fun onDestroy(){
-        ringtone?.stop()
+        vibrator?.cancel()
+        player?.stop()
+        player?.release()
+        player=null
         super.onDestroy()
     }
 }
