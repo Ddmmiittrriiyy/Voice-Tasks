@@ -1,0 +1,9 @@
+package com.voicetasks.next
+
+import android.webkit.JavascriptInterface
+
+class AndroidBridge(private val activity:MainActivity) {
+    @JavascriptInterface fun getCoreVersion()="0.1.0"
+    @JavascriptInterface fun scheduleAlarm(taskId:String,text:String,triggerAtMillis:Long){ AlarmScheduler.schedule(activity,StoredAlarm(taskId,text,triggerAtMillis)) }
+    @JavascriptInterface fun cancelAlarm(taskId:String){ AlarmScheduler.cancel(activity,taskId) }
+}
