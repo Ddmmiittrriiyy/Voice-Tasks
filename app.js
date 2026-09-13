@@ -4,7 +4,7 @@
 
 const STORAGE_KEY = 'voiceTasks_v1';
 const THEME_KEY = 'voiceTasks_theme_v1';
-const PLANNER_VERSION = '0.1.1-next.1';
+const PLANNER_VERSION = '0.1.2-next.1';
 function getAndroidBridge(){ return (window.AndroidBridge && typeof window.AndroidBridge === 'object') ? window.AndroidBridge : null; }
 function hasNativeAlarm(){ const b=getAndroidBridge(); return !!(b && (typeof b.scheduleAlarm==='function' || typeof b.setAlarm==='function')); }
 function getAndroidCoreVersion(){ const b=getAndroidBridge(); if(!b) return null; try{ if(typeof b.getCoreVersion==='function') return String(b.getCoreVersion()||'').trim()||null; }catch(e){} return null; }
@@ -852,40 +852,59 @@ document.addEventListener('click', (e)=>{
 function updateVersionInfo(){const el=document.getElementById('versionInfo');if(!el)return;const core=getAndroidCoreVersion();el.textContent=core?`Planner ${PLANNER_VERSION} · Android Core ${core}`:`Planner ${PLANNER_VERSION}`;} updateVersionInfo();
 
 document.getElementById('exportBtn').onclick = () => {
-  const blob = new Blob([JSON.stringify(tasks, null, 2)], {type:'application/json'});
+  const filename = `voice-tasks-${toISODate(new Date())}.json`;
+  const json = JSON.stringify(tasks, null, 2);
+  const bridge = getAndroidBridge();
+  if(bridge && typeof bridge.exportTasks === 'function'){
+    bridge.exportTasks(json, filename);
+    menu.classList.add('hidden');
+    return;
+  }
+  const blob = new Blob([json], {type:'application/json'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `voice-tasks-${toISODate(new Date())}.json`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
   menu.classList.add('hidden');
 };
 
+function importTasksFromJson(raw){
+  try{
+    const imported = JSON.parse(raw);
+    if(!Array.isArray(imported)) throw new Error('bad format');
+    const byId = new Map(tasks.map(t=>[t.id,t]));
+    for(const t of imported){
+      if(t && t.id) byId.set(t.id, t);
+    }
+    tasks=Array.from(byId.values()).map(normalizeTask);
+    if(!hasNativeAlarm()) tasks.forEach(t=>{t.alarmEnabled=false;t.alarmTriggered=false;});
+    saveTasks(tasks);
+    render();
+    showToast('Импорт завершён');
+  }catch(e){
+    showToast('Не удалось прочитать файл');
+  }
+}
+window.voiceTasksImportJson = importTasksFromJson;
+
 const importFile = document.getElementById('importFile');
-document.getElementById('importBtn').onclick = () => { importFile.click(); menu.classList.add('hidden'); };
+document.getElementById('importBtn').onclick = () => {
+  const bridge = getAndroidBridge();
+  if(bridge && typeof bridge.importTasks === 'function'){
+    bridge.importTasks();
+    menu.classList.add('hidden');
+    return;
+  }
+  importFile.click();
+  menu.classList.add('hidden');
+};
 importFile.onchange = () => {
   const file = importFile.files[0];
   if(!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
-    try{
-      const imported = JSON.parse(reader.result);
-      if(!Array.isArray(imported)) throw new Error('bad format');
-      // объединяем по id, не удаляя существующие
-      const byId = new Map(tasks.map(t=>[t.id,t]));
-      for(const t of imported){
-        if(t && t.id) byId.set(t.id, t);
-      }
-      tasks=Array.from(byId.values()).map(normalizeTask);
-      if(!hasNativeAlarm()) tasks.forEach(t=>{t.alarmEnabled=false;t.alarmTriggered=false;});
-      saveTasks(tasks);
-      render();
-      showToast('Импорт завершён');
-    }catch(e){
-      showToast('Не удалось прочитать файл');
-    }
-  };
+  reader.onload = () => importTasksFromJson(reader.result);
   reader.readAsText(file);
   importFile.value = '';
 };
