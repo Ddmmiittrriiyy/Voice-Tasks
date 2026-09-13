@@ -4,7 +4,7 @@
 
 const STORAGE_KEY = 'voiceTasks_v1';
 const THEME_KEY = 'voiceTasks_theme_v1';
-const PLANNER_VERSION = '0.1.2-next.1';
+const PLANNER_VERSION = '0.1.3-next.2';
 function getAndroidBridge(){ return (window.AndroidBridge && typeof window.AndroidBridge === 'object') ? window.AndroidBridge : null; }
 function hasNativeAlarm(){ const b=getAndroidBridge(); return !!(b && (typeof b.scheduleAlarm==='function' || typeof b.setAlarm==='function')); }
 function getAndroidCoreVersion(){ const b=getAndroidBridge(); if(!b) return null; try{ if(typeof b.getCoreVersion==='function') return String(b.getCoreVersion()||'').trim()||null; }catch(e){} return null; }
@@ -651,18 +651,25 @@ function renderCard(t){
     normalizeTask(t);
     const alarmBtn=document.createElement('button');
     const overdue=isOverdue(t);
+    // Три состояния будильника:
+    // серый = выключен, зелёный = включён и ждёт, красный = реально сработал.
+    // Сам факт просрочки цвет не меняет.
     let alarmState='inactive';
     if(t.alarmTriggered) alarmState='triggered';
     else if(t.alarmEnabled) alarmState='active';
-    else if(overdue) alarmState='overdueInactive';
+
     alarmBtn.className='alarmIconBtn '+alarmState;
-    alarmBtn.type='button'; alarmBtn.textContent='⏰';
+    alarmBtn.type='button';
+    alarmBtn.innerHTML='<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M22 5.72 17.4 1.86l-.65.76 4.6 3.86.65-.76ZM7.24 2.62l-.64-.76L2 5.71l.65.76 4.59-3.85ZM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8ZM12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm0 14.5A6.5 6.5 0 1 1 12 5a6.5 6.5 0 0 1 0 13.5Z"/></svg>';
+
     if(alarmState==='active') alarmBtn.title='Будильник активен — отключить';
     else if(alarmState==='triggered') alarmBtn.title='Будильник сработал — изменить задачу';
-    else if(alarmState==='overdueInactive') alarmBtn.title='Просрочено — изменить задачу';
+    else if(overdue) alarmBtn.title='Будильник выключен — изменить просроченную задачу';
     else alarmBtn.title='Активировать будильник';
+
     alarmBtn.onclick=()=>{
-      if(overdue || t.alarmTriggered){ openEdit(t); return; }
+      // У любой задачи в прошлом нажатие на будильник открывает редактирование.
+      if(overdue){ openEdit(t); return; }
       setAlarmEnabled(t.id,!t.alarmEnabled);
     };
     card.appendChild(alarmBtn);
@@ -695,7 +702,41 @@ function openEdit(t){
 function updateAlarmEditorButton(){if(!alarmToggleBtn)return;alarmToggleBtn.classList.toggle('active',editingAlarmEnabled);alarmToggleBtn.textContent=editingAlarmEnabled?'⏰ Будильник активен — отключить':'⏰ Активировать будильник';}
 if(alarmToggleBtn) alarmToggleBtn.onclick=()=>{if(!hasNativeAlarm())return;if(!editingAlarmEnabled&&(!editDate.value||!editTime.value)){showToast('Для будильника укажите дату и время задачи');return;}editingAlarmEnabled=!editingAlarmEnabled;updateAlarmEditorButton();};
 document.getElementById('modalCancel').onclick = () => modalOverlay.classList.add('hidden');
-document.getElementById('modalSave').onclick=()=>{if(!editingId)return;const t=tasks.find(x=>x.id===editingId);if(!t)return;normalizeTask(t);if(t.alarmEnabled)cancelNativeAlarm(t);t.date=editDate.value||null;t.time=editTime.value||null;t.text=editText.value.trim()||'Без названия';t.alarmEnabled=hasNativeAlarm()?!!editingAlarmEnabled:false;t.alarmTriggered=false;if(t.alarmEnabled&&(!t.date||!t.time)){t.alarmEnabled=false;showToast('Будильник отключён: нет даты или времени');}saveTasks(tasks);if(t.alarmEnabled)scheduleNativeAlarm(t);render();modalOverlay.classList.add('hidden');editingId=null;};
+document.getElementById('modalSave').onclick=()=>{
+  if(!editingId)return;
+  const t=tasks.find(x=>x.id===editingId);
+  if(!t)return;
+  normalizeTask(t);
+
+  const wasTriggered=!!t.alarmTriggered;
+  const oldDate=t.date||null;
+  const oldTime=t.time||null;
+  if(t.alarmEnabled)cancelNativeAlarm(t);
+
+  t.date=editDate.value||null;
+  t.time=editTime.value||null;
+  t.text=editText.value.trim()||'Без названия';
+  t.alarmEnabled=hasNativeAlarm()?!!editingAlarmEnabled:false;
+
+  if(t.alarmEnabled&&(!t.date||!t.time)){
+    t.alarmEnabled=false;
+    showToast('Будильник отключён: нет даты или времени');
+  }
+
+  // Красный означает исторический факт срабатывания.
+  // Сохраняем его, если пользователь просто отредактировал уже прошедшую задачу.
+  // Если поставлен новый будильник или задача перенесена на другое время/дату,
+  // начинается новый цикл и состояние "сработал" сбрасывается.
+  const scheduleChanged=(oldDate!==t.date)||(oldTime!==t.time);
+  if(t.alarmEnabled || scheduleChanged) t.alarmTriggered=false;
+  else t.alarmTriggered=wasTriggered;
+
+  saveTasks(tasks);
+  if(t.alarmEnabled)scheduleNativeAlarm(t);
+  render();
+  modalOverlay.classList.add('hidden');
+  editingId=null;
+};
 
 /* ---------- Подтверждение удаления ---------- */
 const confirmOverlay = document.getElementById('confirmOverlay');
