@@ -768,9 +768,13 @@ if(window.AndroidBridge && window.AndroidBridge.startListening){
     micBtn.classList.remove('listening');
     if(text){ textInput.value = text; submitPhrase(text); textInput.value = ''; }
   };
-  window.startVoiceError = function(){
+  window.startVoiceError = function(code){
     micBtn.classList.remove('listening');
-    showToast('Не удалось распознать голос');
+    if(typeof code === 'number'){
+      showToast('Не удалось распознать голос (' + code + ')');
+    }else{
+      showToast('Не удалось распознать голос');
+    }
   };
   micBtn.onclick = () => {
     micBtn.classList.add('listening');
