@@ -2,6 +2,7 @@ package com.voicetasks.next
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
@@ -20,6 +21,7 @@ class MainActivity:Activity(){
         private const val REQ_AUDIO=100
         private const val REQ_IMPORT=2001
         private const val REQ_EXPORT=2002
+        private const val REQ_VOICE_FALLBACK=2003
     }
 
     private lateinit var web:WebView
@@ -62,7 +64,7 @@ class MainActivity:Activity(){
 
     private fun startVoiceRecognitionGranted(language:String){
         if(!SpeechRecognizer.isRecognitionAvailable(this)){
-            sendVoiceError(-1)
+            startVoiceFallback(language)
             return
         }
 
@@ -74,7 +76,15 @@ class MainActivity:Activity(){
                 override fun onRmsChanged(rmsdB:Float){}
                 override fun onBufferReceived(buffer:ByteArray?){}
                 override fun onEndOfSpeech(){}
-                override fun onError(error:Int){ sendVoiceError(error) }
+                override fun onError(error:Int){
+                    if(error==SpeechRecognizer.ERROR_CLIENT ||
+                       error==SpeechRecognizer.ERROR_SERVER ||
+                       error==SpeechRecognizer.ERROR_SERVER_DISCONNECTED){
+                        startVoiceFallback(pendingVoiceLanguage ?: Locale.getDefault().toLanguageTag())
+                    }else{
+                        sendVoiceError(error)
+                    }
+                }
                 override fun onResults(results:Bundle?){
                     val text=results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
                     if(text.isNullOrBlank()) sendVoiceError(0) else sendVoiceResult(text)
@@ -84,6 +94,8 @@ class MainActivity:Activity(){
             })
         }
 
+        pendingVoiceLanguage=language
+
         val intent=Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE,language)
@@ -91,20 +103,41 @@ class MainActivity:Activity(){
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,1)
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS,false)
         }
+
         try{
             speechRecognizer?.cancel()
             speechRecognizer?.startListening(intent)
+        }catch(_:Exception){
+            startVoiceFallback(language)
+        }
+    }
+
+    private fun startVoiceFallback(language:String){
+        pendingVoiceLanguage=language
+        val intent=Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply{
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL,RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE,language)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE,language)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS,1)
+            putExtra(RecognizerIntent.EXTRA_PROMPT,"Говорите")
+        }
+        try{
+            startActivityForResult(intent,REQ_VOICE_FALLBACK)
+        }catch(_:ActivityNotFoundException){
+            sendVoiceError(-1)
         }catch(_:Exception){
             sendVoiceError(-2)
         }
     }
 
     private fun sendVoiceResult(text:String){
+        pendingVoiceLanguage=null
         val js="window.startVoiceResult && window.startVoiceResult("+JSONObject.quote(text)+");"
         runOnUiThread{ web.evaluateJavascript(js,null) }
     }
 
     private fun sendVoiceError(code:Int){
+        pendingVoiceLanguage=null
         runOnUiThread{ web.evaluateJavascript("window.startVoiceError && window.startVoiceError("+code+");",null) }
     }
 
@@ -132,6 +165,17 @@ class MainActivity:Activity(){
 
     override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
         super.onActivityResult(requestCode,resultCode,data)
+
+        if(requestCode==REQ_VOICE_FALLBACK){
+            if(resultCode==RESULT_OK){
+                val text=data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+                if(text.isNullOrBlank()) sendVoiceError(0) else sendVoiceResult(text)
+            }else{
+                sendVoiceError(-4)
+            }
+            return
+        }
+
         if(resultCode!=RESULT_OK) return
         val uri=data?.data ?: return
 
