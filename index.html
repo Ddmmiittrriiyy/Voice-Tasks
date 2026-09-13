@@ -8,7 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-next.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icon-192.png">
-<link rel="stylesheet" href="style.css?v=next-0.1.0">
+<link rel="stylesheet" href="style.css?v=next-0.1.1">
 </head>
 <body>
 
@@ -25,6 +25,9 @@
   </div>
 </header>
 
+<div id="doneToolbar" class="doneToolbar hidden">
+  <button id="deleteAllDoneBtn" class="deleteAllDoneBtn" type="button">Удалить все выполненные</button>
+</div>
 <main id="list" class="list"></main>
 
 <p id="empty" class="empty hidden">Пока пусто. Скажите или напишите задачу ниже.</p>
@@ -68,6 +71,17 @@
   </div>
 </div>
 
+<div id="confirmAllDoneOverlay" class="overlay hidden">
+  <div class="modal small">
+    <h2>Удалить все выполненные?</h2>
+    <p class="confirmText">Все выполненные задачи будут удалены. Действие нельзя отменить.</p>
+    <div class="modalActions">
+      <button id="confirmAllDoneCancel" class="btnGhost">Отмена</button>
+      <button id="confirmAllDoneDelete" class="btnDanger">Удалить все</button>
+    </div>
+  </div>
+</div>
+
 <div id="confirmOverlay" class="overlay hidden">
   <div class="modal small">
     <h2>Удалить задачу?</h2>
@@ -89,6 +103,6 @@
   <div id="versionInfo" class="versionInfo" aria-label="Версия приложения"></div>
 </div>
 
-<script src="app.js?v=next-0.1.0"></script>
+<script src="app.js?v=next-0.1.1"></script>
 </body>
 </html>

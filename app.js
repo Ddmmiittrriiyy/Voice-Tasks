@@ -4,7 +4,7 @@
 
 const STORAGE_KEY = 'voiceTasks_v1';
 const THEME_KEY = 'voiceTasks_theme_v1';
-const PLANNER_VERSION = '0.1.0-next.1';
+const PLANNER_VERSION = '0.1.1-next.1';
 function getAndroidBridge(){ return (window.AndroidBridge && typeof window.AndroidBridge === 'object') ? window.AndroidBridge : null; }
 function hasNativeAlarm(){ const b=getAndroidBridge(); return !!(b && (typeof b.scheduleAlarm==='function' || typeof b.setAlarm==='function')); }
 function getAndroidCoreVersion(){ const b=getAndroidBridge(); if(!b) return null; try{ if(typeof b.getCoreVersion==='function') return String(b.getCoreVersion()||'').trim()||null; }catch(e){} return null; }
@@ -436,6 +436,8 @@ function render(options={}){
 
   listEl.innerHTML = '';
   emptyEl.classList.toggle('hidden', filtered.length>0);
+  const doneToolbar = document.getElementById('doneToolbar');
+  if(doneToolbar) doneToolbar.classList.toggle('hidden', currentView !== 'done' || filtered.length === 0);
 
   const groups = new Map();
   const noDate = [];
@@ -692,6 +694,24 @@ document.getElementById('confirmDelete').onclick = () => {
   if(deletingId) deleteTask(deletingId);
   confirmOverlay.classList.add('hidden');
   deletingId = null;
+};
+
+/* ---------- Массовое удаление выполненных ---------- */
+const deleteAllDoneBtn = document.getElementById('deleteAllDoneBtn');
+const confirmAllDoneOverlay = document.getElementById('confirmAllDoneOverlay');
+if(deleteAllDoneBtn){
+  deleteAllDoneBtn.onclick = () => {
+    if(!tasks.some(t=>t.done)) return;
+    confirmAllDoneOverlay.classList.remove('hidden');
+  };
+}
+document.getElementById('confirmAllDoneCancel').onclick = () => confirmAllDoneOverlay.classList.add('hidden');
+document.getElementById('confirmAllDoneDelete').onclick = () => {
+  tasks = tasks.filter(t=>!t.done);
+  saveTasks(tasks);
+  confirmAllDoneOverlay.classList.add('hidden');
+  render();
+  showToast('Выполненные задачи удалены');
 };
 
 /* ---------- Вкладки ---------- */
