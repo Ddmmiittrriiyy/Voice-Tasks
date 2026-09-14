@@ -1,15 +1,23 @@
 package com.voicetasks.next
 
 import android.content.*
-import android.app.*
+import android.os.Build
 
 class AlarmReceiver:BroadcastReceiver(){
     override fun onReceive(c:Context,i:Intent){
         val id=i.getStringExtra("id")?:""
         val text=i.getStringExtra("text")?:"Задача"
+
         AlarmStore.remove(c,id)
         AlarmStore.markTriggered(c,id)
-        val launch=Intent(c,AlarmActivity::class.java).putExtra("id",id).putExtra("text",text).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        c.startActivity(launch)
+
+        val serviceIntent=Intent(c,AlarmService::class.java).apply{
+            action=AlarmService.ACTION_START
+            putExtra(AlarmService.EXTRA_ID,id)
+            putExtra(AlarmService.EXTRA_TEXT,text)
+        }
+
+        if(Build.VERSION.SDK_INT>=26) c.startForegroundService(serviceIntent)
+        else c.startService(serviceIntent)
     }
 }
