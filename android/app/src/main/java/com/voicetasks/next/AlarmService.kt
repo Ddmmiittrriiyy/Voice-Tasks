@@ -7,7 +7,6 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.*
-import androidx.annotation.RequiresApi
 
 class AlarmService:Service(){
     companion object{
